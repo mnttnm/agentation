@@ -1,6 +1,11 @@
 // Annotation Popup - CSS-only version (no framer-motion)
 // Uses CSS animations for all transitions
 
+// Reset SVG fill to prevent host page styles (e.g. `svg { fill: currentColor }`) from breaking icons
+svg {
+  fill: unset;
+}
+
 $blue: #3c82f7;
 $green: #34c759;
 
