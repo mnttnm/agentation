@@ -1,0 +1,272 @@
+"use client";
+
+import { Footer } from "../Footer";
+import { CodeBlock } from "../components/CodeBlock";
+
+function ToolName({ children }: { children: string }) {
+  return (
+    <h3 style={{ fontFamily: "'SF Mono', monospace", fontSize: "0.75rem", letterSpacing: "-0.01em" }}>
+      {children}
+    </h3>
+  );
+}
+
+export default function McpPage() {
+  return (
+    <>
+      <article className="article">
+        <header>
+          <h1>MCP Server</h1>
+          <p className="tagline">
+            Connect AI agents to web page annotations via the Model Context Protocol
+          </p>
+        </header>
+
+        <section>
+          <h2 id="overview">Overview</h2>
+          <p>
+            The <code>agentation-mcp</code> package provides an MCP server that allows AI coding agents
+            (like Claude Code) to receive and respond to web page annotations created with the Agentation toolbar.
+            This bypasses copy-paste entirely &mdash; just annotate and talk to your agent. It already has full context.
+          </p>
+          <p>
+            It runs both an <strong>HTTP server</strong> (for the browser toolbar) and an{" "}
+            <strong>MCP server</strong> (for agents via stdio), sharing the same data store.
+          </p>
+          <p style={{ marginTop: "0.75rem", fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            <code>toolbar</code> → <code>server</code> → <code>agent</code>
+          </p>
+        </section>
+
+        <section>
+          <h2 id="installation">Installation</h2>
+          <CodeBlock
+            language="bash"
+            copyable
+            code={`npm install agentation-mcp
+# or
+pnpm add agentation-mcp`}
+          />
+        </section>
+
+        <section>
+          <h2 id="quick-start">Quick Start</h2>
+
+          <h3>1. Set up the MCP server</h3>
+          <p>Run the interactive setup wizard:</p>
+          <CodeBlock language="bash" copyable code={`npx agentation-mcp init`} />
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)", marginTop: "0.5rem" }}>
+            This configures Claude Code to use the Agentation MCP server.
+          </p>
+
+          <h3>2. Start the server</h3>
+          <CodeBlock language="bash" copyable code={`npx agentation-mcp server`} />
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)", marginTop: "0.5rem" }}>
+            This starts both the HTTP server (port 4747) and MCP server (stdio).
+          </p>
+
+          <h3>3. Verify your setup</h3>
+          <CodeBlock language="bash" copyable code={`npx agentation-mcp doctor`} />
+        </section>
+
+        <section>
+          <h2 id="cli-commands">CLI Commands</h2>
+          <CodeBlock
+            language="bash"
+            code={`npx agentation-mcp init                    # Interactive setup wizard
+npx agentation-mcp server [options]        # Start the annotation server
+npx agentation-mcp doctor                  # Check your setup
+npx agentation-mcp help                    # Show help`}
+          />
+        </section>
+
+        <section>
+          <h2 id="server-options">Server Options</h2>
+          <CodeBlock
+            language="bash"
+            code={`--port <port>      # HTTP server port (default: 4747)
+--mcp-only         # Skip HTTP server, only run MCP on stdio
+--http-url <url>   # HTTP server URL for MCP to fetch from`}
+          />
+        </section>
+
+        <section>
+          <h2 id="claude-code">Claude Code</h2>
+          <p>
+            To connect Claude Code to the Agentation MCP server:
+          </p>
+
+          <h3>1. Start the server</h3>
+          <CodeBlock language="bash" copyable code={`npx agentation-mcp server`} />
+
+          <h3>2. Add the MCP server to Claude Code</h3>
+          <CodeBlock language="bash" copyable code={`claude mcp add http://localhost:4747/mcp`} />
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)", marginTop: "0.5rem" }}>
+            This registers the Agentation MCP server with Claude Code. Once connected, Claude can
+            use all the Agentation tools to read and respond to your annotations.
+          </p>
+
+          <h3>3. Verify the connection</h3>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            In Claude Code, you can verify the server is connected by asking Claude to list your
+            annotation sessions. If the server is running, Claude will be able to use the{" "}
+            <code>agentation_list_sessions</code> tool.
+          </p>
+        </section>
+
+        <section>
+          <h2 id="mcp-tools">MCP Tools</h2>
+          <p>
+            Nine tools are exposed to AI agents via the{" "}
+            <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer">
+              Model Context Protocol
+            </a>:
+          </p>
+
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.75rem", marginTop: "1rem", marginBottom: "1.5rem" }}>
+            <thead>
+              <tr>
+                <th style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(0,0,0,0.1)", textAlign: "left", fontWeight: 500 }}>Tool</th>
+                <th style={{ padding: "0.5rem 0", borderBottom: "1px solid rgba(0,0,0,0.1)", textAlign: "left", fontWeight: 500 }}>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_list_sessions</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>List all active annotation sessions</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_get_session</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Get a session with all its annotations</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_get_pending</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Get pending annotations for a session</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_get_all_pending</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Get pending annotations across all sessions</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_acknowledge</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Mark an annotation as acknowledged</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_resolve</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Mark an annotation as resolved</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_dismiss</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Dismiss an annotation with a reason</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_reply</td>
+                <td style={{ padding: "0.375rem 0", borderBottom: "1px solid rgba(0,0,0,0.06)", color: "rgba(0,0,0,0.6)" }}>Add a reply to an annotation thread</td>
+              </tr>
+              <tr>
+                <td style={{ padding: "0.375rem 0", fontFamily: "monospace", fontSize: "0.6875rem" }}>agentation_wait_for_action</td>
+                <td style={{ padding: "0.375rem 0", color: "rgba(0,0,0,0.6)" }}>Block until user clicks &ldquo;Send to Agent&rdquo;</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3 style={{ marginTop: "1.5rem" }}>Tool Details</h3>
+
+          <ToolName>agentation_list_sessions</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            List all active annotation sessions. Use this to discover which pages have feedback.
+          </p>
+
+          <ToolName>agentation_get_session</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Get a session with all its annotations. Input: <code>sessionId</code>
+          </p>
+
+          <ToolName>agentation_get_pending</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Get all pending (unacknowledged) annotations for a session. Use this to see what feedback
+            needs attention. Input: <code>sessionId</code>
+          </p>
+          <CodeBlock
+            language="json"
+            code={`// Response
+{
+  "count": 1,
+  "annotations": [{
+    "id": "ann_123",
+    "comment": "Button is cut off on mobile",
+    "element": "button",
+    "elementPath": "body > main > .hero > button.cta",
+    "reactComponents": "App > LandingPage > HeroSection > Button",
+    "intent": "fix",
+    "severity": "blocking"
+  }]
+}`}
+          />
+
+          <ToolName>agentation_get_all_pending</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Get all pending annotations across ALL sessions. Use this to see all unaddressed feedback
+            from the human across all pages.
+          </p>
+
+          <ToolName>agentation_acknowledge</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Mark an annotation as acknowledged. Use this to let the human know you&apos;ve seen their
+            feedback and will address it. Input: <code>annotationId</code>
+          </p>
+
+          <ToolName>agentation_resolve</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Mark an annotation as resolved. Use this after you&apos;ve addressed the feedback. Optionally
+            include a summary of what you did. Input: <code>annotationId</code>, optional <code>summary</code>
+          </p>
+
+          <ToolName>agentation_dismiss</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Dismiss an annotation. Use this when you&apos;ve decided not to address the feedback, with a
+            reason why. Input: <code>annotationId</code>, <code>reason</code>
+          </p>
+
+          <ToolName>agentation_reply</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Add a reply to an annotation&apos;s thread. Use this to ask clarifying questions or provide
+            updates to the human. Input: <code>annotationId</code>, <code>message</code>
+          </p>
+
+          <ToolName>agentation_wait_for_action</ToolName>
+          <p style={{ fontSize: "0.8125rem", color: "rgba(0,0,0,0.55)" }}>
+            Block until the user clicks &ldquo;Send to Agent&rdquo; in the browser. Returns the action request
+            with all annotations and formatted output. Use this to receive push-like notifications instead
+            of polling. Input: optional <code>sessionId</code>, optional <code>timeoutSeconds</code> (default: 60, max: 300)
+          </p>
+        </section>
+
+        <section>
+          <h2 id="types">TypeScript Types</h2>
+          <p>
+            The package exports all types for use in your own integrations:
+          </p>
+          <CodeBlock
+            language="typescript"
+            code={`import type {
+  Annotation,
+  AnnotationIntent,    // "fix" | "change" | "question" | "approve"
+  AnnotationSeverity,  // "blocking" | "important" | "suggestion"
+  AnnotationStatus,    // "pending" | "acknowledged" | "resolved" | "dismissed"
+  Session,
+  SessionStatus,       // "active" | "approved" | "closed"
+  SessionWithAnnotations,
+  ThreadMessage,
+  SAFEvent,
+  SAFEventType,
+  ActionRequest,
+} from 'agentation-mcp';`}
+          />
+        </section>
+      </article>
+
+      <Footer />
+    </>
+  );
+}
