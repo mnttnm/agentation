@@ -2926,7 +2926,7 @@ export function PageFeedbackToolbarCSS({
                     <span
                       className={`${styles.toggleLabel} ${!isDarkMode ? styles.light : ""}`}
                     >
-                      Clear after output
+                      Clear on copy/send
                       <Tooltip content="Automatically clear annotations after copying">
                         <span
                           className={`${styles.helpIcon} ${styles["helpIconNudge1-5"]}`}

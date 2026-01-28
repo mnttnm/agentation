@@ -1384,7 +1384,7 @@ export function SettingsDemo() {
       await delay(2200);
       if (cancelled) return;
 
-      // Click "Clear after output" checkbox
+      // Click "Clear on copy/send" checkbox
       setActiveCaption("clear");
       setCursorPos(pos.clearCheckbox);
       await delay(1000);
@@ -1554,7 +1554,7 @@ export function SettingsDemo() {
                 )}
               </span>
               <span className="sd-checkbox-label">
-                Clear after output
+                Clear on copy/send
                 <span className="sd-help-icon">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10"/>
