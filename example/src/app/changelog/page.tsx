@@ -24,11 +24,15 @@ const badgeLabels: Record<ChangeType, string> = {
   removed: "Removed",
 };
 
+function isMajorVersion(version: string): boolean {
+  return version.endsWith(".0.0");
+}
+
 const releases: Release[] = [
   {
     version: "2.0.0",
     date: "January 25, 2026",
-    summary: "The shift from \"annotate, copy, paste\" to \"annotate and collaborate.\" Agents now see your annotations directly.",
+    summary: "The shift from \"annotate, copy, paste\" to \"annotate and collaborate.\" Agents now see your annotations directly. This update adds MCP server integration, webhooks, React component detection, Shadow DOM support, and much more.",
     changes: [
       { type: "added", text: <><a href="/mcp" className="styled-link">MCP server</a> for direct agent integration — agents can fetch, acknowledge, resolve, and dismiss annotations</> },
       { type: "added", text: "HTTP API and Server-Sent Events for real-time updates" },
@@ -117,7 +121,13 @@ export default function ChangelogPage() {
 
         {releases.map((release, i) => (
           <section key={release.version}>
-            <h2>
+            <h2
+              style={
+                isMajorVersion(release.version)
+                  ? { fontSize: "1.125rem" }
+                  : undefined
+              }
+            >
               <a
                 href={`https://www.npmjs.com/package/agentation/v/${release.version}`}
                 target="_blank"
@@ -127,7 +137,7 @@ export default function ChangelogPage() {
                   textDecoration: "none",
                 }}
               >
-                {release.version === "1.0.0" || release.version === "2.0.0" ? (
+                {isMajorVersion(release.version) ? (
                   <span className="sketchy-underline" style={{ "--marker-color": "#febc2e" } as React.CSSProperties}>
                     {release.version}
                   </span>
@@ -140,6 +150,7 @@ export default function ChangelogPage() {
                   fontWeight: 400,
                   color: "rgba(0, 0, 0, 0.35)",
                   marginLeft: "0",
+                  ...(isMajorVersion(release.version) && { fontSize: "0.8125rem" }),
                 }}
               >
                 {release.date}
