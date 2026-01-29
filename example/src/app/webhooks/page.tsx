@@ -2,6 +2,7 @@
 
 import { Footer } from "../Footer";
 import { CodeBlock } from "../components/CodeBlock";
+import { WebhooksDiagram } from "../components/WebhooksDiagram";
 
 export default function WebhooksPage() {
   return (
@@ -24,6 +25,8 @@ export default function WebhooksPage() {
             Configure a webhook URL via the <code>webhookUrl</code> prop, and events will be sent automatically
             when annotations are created, updated, deleted, or submitted.
           </p>
+
+          <WebhooksDiagram />
         </section>
 
         <section>

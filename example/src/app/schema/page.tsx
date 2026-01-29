@@ -2,6 +2,7 @@
 
 import { Footer } from "../Footer";
 import { CodeBlock } from "../components/CodeBlock";
+import { SchemaDiagram } from "../components/SchemaDiagram";
 
 export default function SchemaPage() {
   return (
@@ -45,6 +46,8 @@ export default function SchemaPage() {
             This spec defines the annotation object shape. Tools can emit annotations
             in this format, and agents can consume them regardless of how they were created.
           </p>
+
+          <SchemaDiagram />
         </section>
 
         <section>
