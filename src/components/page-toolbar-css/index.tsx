@@ -352,7 +352,7 @@ function generateOutput(
       if (a.nearbyElements) {
         output += `**Nearby Elements:** ${a.nearbyElements}\n`;
       }
-      if (a.reactComponents && reactMode !== "off") {
+      if (a.reactComponents) {
         output += `**React:** ${a.reactComponents}\n`;
       }
       output += `**Feedback:** ${a.comment}\n\n`;
@@ -361,8 +361,8 @@ function generateOutput(
       output += `### ${i + 1}. ${a.element}\n`;
       output += `**Location:** ${a.elementPath}\n`;
 
-      // React components in both standard and detailed (if not turned off)
-      if (a.reactComponents && reactMode !== "off") {
+      // React components in both standard and detailed
+      if (a.reactComponents) {
         output += `**React:** ${a.reactComponents}\n`;
       }
 
@@ -3268,7 +3268,7 @@ export function PageFeedbackToolbarCSS({
                       <Tooltip
                         content={
                           !isLocalhost
-                            ? "Only available on localhost"
+                            ? "Disabled — production builds minify component names, making detection unreliable. Use on localhost in development mode."
                             : "Include React component names in annotations"
                         }
                       >
