@@ -28,6 +28,7 @@ export type Annotation = {
     height: number;
   }>; // Individual bounding boxes for multi-select hover highlighting
   drawingIndex?: number; // Index of linked drawing stroke (click-to-annotate)
+  strokeId?: string; // Unique ID of linked drawing stroke
 
   // Protocol fields (added when syncing to server)
   sessionId?: string;

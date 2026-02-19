@@ -541,6 +541,8 @@ export function PageFeedbackToolbarCSS({
 }: PageFeedbackToolbarCSSProps = {}) {
   const [isActive, setIsActive] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const annotationsRef = useRef<Annotation[]>([]);
+  annotationsRef.current = annotations;
   const [showMarkers, setShowMarkers] = useState(true);
 
   // Unified marker visibility state - controls both toolbar and eye toggle
@@ -577,6 +579,7 @@ export function PageFeedbackToolbarCSS({
     // Element reference for single-select (for live position queries)
     targetElement?: HTMLElement;
     drawingIndex?: number;
+    strokeId?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [sendState, setSendState] = useState<
@@ -615,12 +618,17 @@ export function PageFeedbackToolbarCSS({
 
   // Draw mode state
   const [isDrawMode, setIsDrawMode] = useState(false);
-  const [drawStrokes, setDrawStrokes] = useState<Array<{ points: Array<{x: number, y: number}>; color: string; fixed: boolean }>>([]);
+  const [drawStrokes, setDrawStrokes] = useState<Array<{ id: string; points: Array<{x: number, y: number}>; color: string; fixed: boolean }>>([]);
+  const drawStrokesRef = useRef(drawStrokes);
+  drawStrokesRef.current = drawStrokes;
   const [hoveredDrawingIdx, setHoveredDrawingIdx] = useState<number | null>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
   const currentStrokeRef = useRef<Array<{x: number, y: number}>>([]);
-  const [drawCanvasFading, setDrawCanvasFading] = useState(false);
+  const dimAmountRef = useRef(0);
+  const visualHighlightRef = useRef<number | null>(null);
+  const exitingStrokeIdRef = useRef<string | null>(null);
+  const exitingAlphaRef = useRef(1);
 
 
   // Cmd+shift+click multi-select state
@@ -1576,6 +1584,9 @@ export function PageFeedbackToolbarCSS({
       [data-annotation-marker], [data-annotation-marker] * {
         cursor: pointer !important;
       }
+      html[data-drawing-hover], html[data-drawing-hover] * {
+        cursor: pointer !important;
+      }
     `;
     document.head.appendChild(style);
 
@@ -1585,13 +1596,13 @@ export function PageFeedbackToolbarCSS({
     };
   }, [isActive]);
 
-  // Cursor change when hovering a drawing stroke
+  // Cursor change when hovering a drawing stroke (both draw mode and normal mode)
   useEffect(() => {
-    if (hoveredDrawingIdx !== null && isActive && !isDrawMode) {
-      document.body.style.cursor = "pointer";
-      return () => { document.body.style.cursor = ""; };
+    if (hoveredDrawingIdx !== null && isActive) {
+      document.documentElement.setAttribute("data-drawing-hover", "");
+      return () => document.documentElement.removeAttribute("data-drawing-hover");
     }
-  }, [hoveredDrawingIdx, isActive, isDrawMode]);
+  }, [hoveredDrawingIdx, isActive]);
 
   // Handle mouse move
   useEffect(() => {
@@ -1721,7 +1732,7 @@ export function PageFeedbackToolbarCSS({
           e.stopPropagation();
 
           // If annotation already exists for this drawing, open it in edit mode
-          const existingAnnotation = annotations.find(a => a.drawingIndex === strokeIdx);
+          const existingAnnotation = annotations.find(a => a.strokeId === drawStrokes[strokeIdx]?.id || a.drawingIndex === strokeIdx);
           if (existingAnnotation) {
             startEditAnnotation(existingAnnotation);
             return;
@@ -1730,22 +1741,10 @@ export function PageFeedbackToolbarCSS({
           const stroke = drawStrokes[strokeIdx];
           const scrollYNow = window.scrollY;
 
-          // Compute stroke bounding box in viewport coords
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          for (const p of stroke.points) {
-            const vy = stroke.fixed ? p.y : p.y - scrollYNow;
-            minX = Math.min(minX, p.x);
-            minY = Math.min(minY, vy);
-            maxX = Math.max(maxX, p.x);
-            maxY = Math.max(maxY, vy);
-          }
-          const centerX = (minX + maxX) / 2;
-          const centerY = (minY + maxY) / 2;
-
-          // Temporarily hide canvas to find element underneath
+          // Temporarily hide canvas to find element underneath at click point
           const canvas = drawCanvasRef.current;
           if (canvas) canvas.style.visibility = "hidden";
-          const elementUnder = deepElementFromPoint(centerX, centerY);
+          const elementUnder = deepElementFromPoint(e.clientX, e.clientY);
           if (canvas) canvas.style.visibility = "";
 
           const gestureShape = classifyStrokeGesture(stroke.points, stroke.fixed);
@@ -1783,13 +1782,14 @@ export function PageFeedbackToolbarCSS({
             };
           }
 
-          const x = (centerX / window.innerWidth) * 100;
-          const y = isFixed ? centerY : centerY + scrollYNow;
+          // Position marker at click point (on the stroke)
+          const annX = (e.clientX / window.innerWidth) * 100;
+          const annY = isFixed ? e.clientY : e.clientY + scrollYNow;
 
           setPendingAnnotation({
-            x,
-            y,
-            clientY: centerY,
+            x: annX,
+            y: annY,
+            clientY: e.clientY,
             element: name,
             elementPath: path,
             boundingBox,
@@ -1804,6 +1804,7 @@ export function PageFeedbackToolbarCSS({
             reactComponents: reactComponents ?? undefined,
             targetElement: elementUnder ?? undefined,
             drawingIndex: strokeIdx,
+            strokeId: stroke.id,
           });
           setHoverInfo(null);
           setHoveredDrawingIdx(null);
@@ -2423,8 +2424,8 @@ export function PageFeedbackToolbarCSS({
     return () => document.removeEventListener("mouseup", handleMouseUp);
   }, [isActive, isDragging]);
 
-  // Draw mode: redraw helper — dims non-hovered strokes to 30% when one is highlighted
-  const redrawCanvas = useCallback((ctx: CanvasRenderingContext2D, strokes: typeof drawStrokes, hoveredIdx?: number | null) => {
+  // Draw mode: redraw helper — dimAmount 0–1 controls non-hovered stroke opacity
+  const redrawCanvas = useCallback((ctx: CanvasRenderingContext2D, strokes: typeof drawStrokes, hoveredIdx?: number | null, dimAmount = 0) => {
     const scrollY = window.scrollY;
     const dpr = window.devicePixelRatio || 1;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -2449,7 +2450,12 @@ export function PageFeedbackToolbarCSS({
       const stroke = strokes[si];
       if (stroke.points.length < 2) continue;
       const offsetY = stroke.fixed ? 0 : scrollY;
-      ctx.globalAlpha = (hoveredIdx != null && si !== hoveredIdx) ? 0.3 : 1;
+      // Per-stroke alpha: dim non-hovered strokes, fade exiting stroke
+      let alpha = (hoveredIdx != null && si !== hoveredIdx) ? 1 - 0.7 * dimAmount : 1;
+      if (exitingStrokeIdRef.current && stroke.id === exitingStrokeIdRef.current) {
+        alpha *= exitingAlphaRef.current;
+      }
+      ctx.globalAlpha = alpha;
       ctx.beginPath();
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = 3;
@@ -2506,7 +2512,8 @@ export function PageFeedbackToolbarCSS({
         // Hover detection on completed strokes (not actively drawing)
         const strokeIdx = findStrokeAtPoint(e.clientX, e.clientY, drawStrokes);
         setHoveredDrawingIdx(strokeIdx);
-        canvas.style.cursor = strokeIdx !== null ? "pointer" : "crosshair";
+        if (strokeIdx !== null) canvas.setAttribute("data-stroke-hover", "");
+        else canvas.removeAttribute("data-stroke-hover");
         return;
       }
       const point = { x: e.clientX, y: e.clientY };
@@ -2539,7 +2546,7 @@ export function PageFeedbackToolbarCSS({
           currentStrokeRef.current = [];
           drawClickStartRef.current = null;
           // Redraw to clear any partial stroke artifact
-          redrawCanvas(ctx, drawStrokes, clickStart.strokeIdx);
+          redrawCanvas(ctx, drawStrokes, clickStart.strokeIdx, dimAmountRef.current);
 
           const strokeIdx = clickStart.strokeIdx;
 
@@ -2554,17 +2561,9 @@ export function PageFeedbackToolbarCSS({
           const stroke = drawStrokes[strokeIdx];
           const scrollYNow = window.scrollY;
 
-          // Compute bounding box in viewport coords
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          for (const p of stroke.points) {
-            const vy = stroke.fixed ? p.y : p.y - scrollYNow;
-            minX = Math.min(minX, p.x);
-            minY = Math.min(minY, vy);
-            maxX = Math.max(maxX, p.x);
-            maxY = Math.max(maxY, vy);
-          }
-          const centerX = (minX + maxX) / 2;
-          const centerY = (minY + maxY) / 2;
+          // Use click position for element detection
+          const centerX = e.clientX;
+          const centerY = e.clientY;
 
           // Temporarily hide canvas to find element underneath
           canvas.style.visibility = "hidden";
@@ -2606,13 +2605,14 @@ export function PageFeedbackToolbarCSS({
             };
           }
 
-          const x = (centerX / window.innerWidth) * 100;
-          const y = isFixed ? centerY : centerY + scrollYNow;
+          // Position marker at click point (on the stroke)
+          const annX = (e.clientX / window.innerWidth) * 100;
+          const annY = isFixed ? e.clientY : e.clientY + scrollYNow;
 
           setPendingAnnotation({
-            x,
-            y,
-            clientY: centerY,
+            x: annX,
+            y: annY,
+            clientY: e.clientY,
             element: name,
             elementPath: path,
             boundingBox,
@@ -2627,6 +2627,7 @@ export function PageFeedbackToolbarCSS({
             reactComponents: reactComponents ?? undefined,
             targetElement: elementUnder ?? undefined,
             drawingIndex: strokeIdx,
+            strokeId: stroke.id,
           });
           setHoverInfo(null);
           setHoveredDrawingIdx(null);
@@ -2685,7 +2686,8 @@ export function PageFeedbackToolbarCSS({
           : pts.map(p => ({ x: p.x, y: p.y + window.scrollY }));
 
         const newStrokeIdx = drawStrokes.length;
-        const newStroke = { points: finalPoints, color: settings.annotationColor, fixed: isFixed };
+        const newStrokeId = crypto.randomUUID();
+        const newStroke = { id: newStrokeId, points: finalPoints, color: settings.annotationColor, fixed: isFixed };
 
         // Identify element underneath for annotation
         const gestureShape = classifyStrokeGesture(finalPoints, isFixed);
@@ -2726,14 +2728,16 @@ export function PageFeedbackToolbarCSS({
 
         setDrawStrokes(prev => [...prev, newStroke]);
 
-        // Immediately open annotation popup for the new drawing
-        const annX = (centerX / window.innerWidth) * 100;
-        const annY = isFixed ? centerY : centerY + window.scrollY;
+        // Position marker at the end of the stroke (where the pen was released)
+        const lastPt = finalPoints[finalPoints.length - 1];
+        const lastPtViewY = isFixed ? lastPt.y : lastPt.y - window.scrollY;
+        const annX = (lastPt.x / window.innerWidth) * 100;
+        const annY = lastPt.y; // Already in page coords (finalPoints are converted)
 
         setPendingAnnotation({
           x: annX,
           y: annY,
-          clientY: centerY,
+          clientY: lastPtViewY,
           element: name,
           elementPath: elPath,
           boundingBox,
@@ -2748,16 +2752,16 @@ export function PageFeedbackToolbarCSS({
           reactComponents: reactComponents ?? undefined,
           targetElement: centerEl ?? undefined,
           drawingIndex: newStrokeIdx,
+          strokeId: newStrokeId,
         });
         setHoverInfo(null);
       }
       currentStrokeRef.current = [];
     };
 
-    const handleMouseLeave = (e: MouseEvent) => {
-      handleMouseUp(e);
+    const handleMouseLeave = () => {
       setHoveredDrawingIdx(null);
-      canvas.style.cursor = "crosshair";
+      canvas.removeAttribute("data-stroke-hover");
     };
 
     canvas.addEventListener("mousedown", handleMouseDown);
@@ -2779,8 +2783,6 @@ export function PageFeedbackToolbarCSS({
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
 
-    const effectiveHighlight = hoveredDrawingIdx ?? pendingAnnotation?.drawingIndex ?? null;
-
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       canvas.style.width = window.innerWidth + "px";
@@ -2788,12 +2790,12 @@ export function PageFeedbackToolbarCSS({
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
       const ctx = canvas.getContext("2d");
-      if (ctx) redrawCanvas(ctx, drawStrokes, effectiveHighlight);
+      if (ctx) redrawCanvas(ctx, drawStrokes, visualHighlightRef.current, dimAmountRef.current);
     };
 
     const onScroll = () => {
       const ctx = canvas.getContext("2d");
-      if (ctx) redrawCanvas(ctx, drawStrokes, effectiveHighlight);
+      if (ctx) redrawCanvas(ctx, drawStrokes, visualHighlightRef.current, dimAmountRef.current);
     };
 
     resize();
@@ -2803,17 +2805,48 @@ export function PageFeedbackToolbarCSS({
       window.removeEventListener("resize", resize);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [isActive, drawStrokes, hoveredDrawingIdx, pendingAnnotation?.drawingIndex, redrawCanvas]);
+  }, [isActive, drawStrokes, redrawCanvas]);
 
-  // Redraw canvas when hover highlight changes (dim non-hovered strokes)
+  // Animate dim in/out when hovering drawings
   useEffect(() => {
     const canvas = drawCanvasRef.current;
     if (!canvas || !isActive || drawStrokes.length === 0) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const effectiveHighlight = hoveredDrawingIdx ?? pendingAnnotation?.drawingIndex ?? null;
-    redrawCanvas(ctx, drawStrokes, effectiveHighlight);
-  }, [isActive, hoveredDrawingIdx, pendingAnnotation?.drawingIndex, drawStrokes, redrawCanvas]);
+
+    const effectiveHighlight = hoveredDrawingIdx ?? pendingAnnotation?.drawingIndex ?? editingAnnotation?.drawingIndex ?? null;
+    const targetDim = effectiveHighlight != null ? 1 : 0;
+
+    // Update visual highlight ref — keep old value during fade-out
+    if (effectiveHighlight != null) {
+      visualHighlightRef.current = effectiveHighlight;
+    }
+
+    // Already at target — just redraw with current value
+    if (Math.abs(dimAmountRef.current - targetDim) < 0.01) {
+      dimAmountRef.current = targetDim;
+      if (targetDim === 0) visualHighlightRef.current = null;
+      const ctx = canvas.getContext("2d");
+      if (ctx) redrawCanvas(ctx, drawStrokes, visualHighlightRef.current, targetDim);
+      return;
+    }
+
+    let raf: number;
+    const animate = () => {
+      const diff = targetDim - dimAmountRef.current;
+      if (Math.abs(diff) < 0.01) {
+        dimAmountRef.current = targetDim;
+        if (targetDim === 0) visualHighlightRef.current = null;
+      } else {
+        dimAmountRef.current += diff * 0.25;
+      }
+      const ctx = canvas.getContext("2d");
+      if (ctx) redrawCanvas(ctx, drawStrokes, visualHighlightRef.current, dimAmountRef.current);
+      if (Math.abs(dimAmountRef.current - targetDim) > 0.01) {
+        raf = requestAnimationFrame(animate);
+      }
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [isActive, hoveredDrawingIdx, pendingAnnotation?.drawingIndex, editingAnnotation?.drawingIndex, drawStrokes, redrawCanvas]);
 
   // Fire webhook for annotation events - returns true on success, false on failure
   const fireWebhook = useCallback(
@@ -2874,6 +2907,7 @@ export function PageFeedbackToolbarCSS({
         reactComponents: pendingAnnotation.reactComponents,
         elementBoundingBoxes: pendingAnnotation.elementBoundingBoxes,
         drawingIndex: pendingAnnotation.drawingIndex,
+        strokeId: pendingAnnotation.strokeId,
         // Protocol fields for server sync
         ...(endpoint && currentSessionId
           ? {
@@ -2949,29 +2983,52 @@ export function PageFeedbackToolbarCSS({
 
   // Cancel annotation with exit animation
   const cancelAnnotation = useCallback(() => {
-    // If cancelling a drawing-linked annotation, also remove the drawing
-    if (pendingAnnotation?.drawingIndex != null) {
-      const idx = pendingAnnotation.drawingIndex;
-      setDrawStrokes(prev => prev.filter((_, i) => i !== idx));
-      // Shift drawingIndex on annotations pointing to higher indices
-      setAnnotations(prev => prev.map(a =>
-        a.drawingIndex != null && a.drawingIndex > idx
-          ? { ...a, drawingIndex: a.drawingIndex - 1 }
-          : a
-      ));
-    }
+    const strokeId = pendingAnnotation?.strokeId;
     setPendingExiting(true);
+
+    // Fade the linked stroke on canvas in parallel with popup exit
+    if (strokeId) {
+      exitingStrokeIdRef.current = strokeId;
+      exitingAlphaRef.current = 1;
+      const canvas = drawCanvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (ctx) {
+        const start = performance.now();
+        const fade = (now: number) => {
+          const t = Math.min((now - start) / 150, 1);
+          exitingAlphaRef.current = 1 - t;
+          redrawCanvas(ctx, drawStrokesRef.current, visualHighlightRef.current, dimAmountRef.current);
+          if (t < 1) requestAnimationFrame(fade);
+        };
+        requestAnimationFrame(fade);
+      }
+    }
+
     originalSetTimeout(() => {
+      exitingStrokeIdRef.current = null;
+      if (strokeId) {
+        const currentStrokes = drawStrokesRef.current;
+        const drawingIdx = currentStrokes.findIndex(s => s.id === strokeId);
+        if (drawingIdx >= 0) {
+          setDrawStrokes(prev => prev.filter(s => s.id !== strokeId));
+          setAnnotations(prev => prev.map(a =>
+            a.drawingIndex != null && a.drawingIndex > drawingIdx
+              ? { ...a, drawingIndex: a.drawingIndex - 1 }
+              : a
+          ));
+        }
+      }
       setPendingAnnotation(null);
       setPendingExiting(false);
-    }, 150); // Match exit animation duration
+    }, 150);
   }, [pendingAnnotation]);
 
   // Delete annotation with exit animation
   const deleteAnnotation = useCallback(
     (id: string) => {
-      const deletedIndex = annotations.findIndex((a) => a.id === id);
-      const deletedAnnotation = annotations[deletedIndex];
+      const currentAnnotations = annotationsRef.current;
+      const deletedIndex = currentAnnotations.findIndex((a) => a.id === id);
+      const deletedAnnotation = currentAnnotations[deletedIndex];
 
       // Close edit panel with exit animation if deleting the annotation being edited
       if (editingAnnotation?.id === id) {
@@ -3003,28 +3060,45 @@ export function PageFeedbackToolbarCSS({
         });
       }
 
-      // Also delete linked drawing stroke
-      const drawingIdx = deletedAnnotation?.drawingIndex;
-      if (drawingIdx != null) setDrawCanvasFading(true);
+      // Fade the linked stroke on canvas in parallel with marker exit
+      if (deletedAnnotation?.strokeId) {
+        exitingStrokeIdRef.current = deletedAnnotation.strokeId;
+        exitingAlphaRef.current = 1;
+        const canvas = drawCanvasRef.current;
+        const ctx = canvas?.getContext("2d");
+        if (ctx) {
+          const start = performance.now();
+          const fade = (now: number) => {
+            const t = Math.min((now - start) / 150, 1);
+            exitingAlphaRef.current = 1 - t;
+            redrawCanvas(ctx, drawStrokesRef.current, visualHighlightRef.current, dimAmountRef.current);
+            if (t < 1) requestAnimationFrame(fade);
+          };
+          requestAnimationFrame(fade);
+        }
+      }
 
-      // Wait for exit animation then remove
+      // Wait for marker exit animation then remove annotation + linked stroke
       originalSetTimeout(() => {
-        setAnnotations((prev) => {
-          let next = prev.filter((a) => a.id !== id);
-          // If we're removing a linked drawing, shift drawingIndex on annotations pointing to higher indices
-          if (drawingIdx != null) {
-            next = next.map(a =>
+        exitingStrokeIdRef.current = null;
+        // Use strokeId (stable) to find the correct stroke — drawingIndex can be
+        // stale if other strokes were added/removed during the 150ms wait
+        const latestAnn = annotationsRef.current.find(a => a.id === id);
+        const strokeId = latestAnn?.strokeId;
+        const currentStrokes = drawStrokesRef.current;
+        const drawingIdx = strokeId ? currentStrokes.findIndex(s => s.id === strokeId) : -1;
+
+        if (drawingIdx >= 0) {
+          setDrawStrokes(prev => prev.filter(s => s.id !== strokeId));
+          setAnnotations(prev => prev
+            .filter(a => a.id !== id)
+            .map(a =>
               a.drawingIndex != null && a.drawingIndex > drawingIdx
                 ? { ...a, drawingIndex: a.drawingIndex - 1 }
                 : a
-            );
-          }
-          return next;
-        });
-        // Remove the linked drawing stroke
-        if (drawingIdx != null) {
-          setDrawStrokes(prev => prev.filter((_, i) => i !== drawingIdx));
-          setDrawCanvasFading(false);
+            ));
+        } else {
+          setAnnotations((prev) => prev.filter((a) => a.id !== id));
         }
         setExitingMarkers((prev) => {
           const next = new Set(prev);
@@ -3034,13 +3108,15 @@ export function PageFeedbackToolbarCSS({
         setDeletingMarkerId(null);
 
         // Trigger renumber animation for markers after deleted one
-        if (deletedIndex < annotations.length - 1) {
-          setRenumberFrom(deletedIndex);
+        const latestAnnotations = annotationsRef.current;
+        const currentIndex = latestAnnotations.findIndex(a => a.id === id);
+        if (currentIndex >= 0 && currentIndex < latestAnnotations.length - 1) {
+          setRenumberFrom(currentIndex);
           originalSetTimeout(() => setRenumberFrom(null), 200);
         }
       }, 150);
     },
-    [annotations, editingAnnotation, onAnnotationDelete, fireWebhook, endpoint],
+    [editingAnnotation, onAnnotationDelete, fireWebhook, endpoint],
   );
 
   // Handle marker hover - finds element(s) for live position tracking
@@ -3660,6 +3736,7 @@ export function PageFeedbackToolbarCSS({
           e.preventDefault();
           hideTooltipsUntilMouseLeave();
           setShowMarkers((prev) => !prev);
+          if (isDrawMode) setIsDrawMode(false);
         }
       }
 
@@ -3890,6 +3967,7 @@ export function PageFeedbackToolbarCSS({
                   e.stopPropagation();
                   hideTooltipsUntilMouseLeave();
                   setShowMarkers(!showMarkers);
+                  if (isDrawMode) setIsDrawMode(false);
                 }}
                 disabled={!hasAnnotations}
               >
@@ -4428,7 +4506,7 @@ export function PageFeedbackToolbarCSS({
       <canvas
         ref={drawCanvasRef}
         className={`${styles.drawCanvas} ${isDrawMode ? styles.active : ""}`}
-        style={{ opacity: (shouldShowMarkers || isDrawMode) && !drawCanvasFading ? 1 : 0, transition: "opacity 0.15s ease" }}
+        style={{ opacity: shouldShowMarkers ? 1 : 0, transition: "opacity 0.15s ease" }}
         data-feedback-toolbar
       />
 
@@ -5000,8 +5078,10 @@ export function PageFeedbackToolbarCSS({
           {/* Edit annotation popup */}
           {editingAnnotation && (
             <>
-              {/* Show element/area outline while editing */}
-              {editingAnnotation.elementBoundingBoxes?.length
+              {/* Show element/area outline while editing (skip for drawing-linked — drawing is the highlight) */}
+              {editingAnnotation.drawingIndex != null
+                ? null
+                : editingAnnotation.elementBoundingBoxes?.length
                 ? // Cmd+shift+click: show individual element boxes (use live rects when available)
                   (() => {
                     // Use live positions from editingTargetElements when available
