@@ -550,6 +550,10 @@ export function PageFeedbackToolbarCSS({
   );
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [tooltipsHidden, setTooltipsHidden] = useState(false);
+  const [tooltipSessionActive, setTooltipSessionActive] = useState(false);
+  const tooltipSessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // Cmd+shift+click multi-select state
   const [pendingMultiSelectElements, setPendingMultiSelectElements] = useState<
@@ -571,6 +575,31 @@ export function PageFeedbackToolbarCSS({
   const showTooltipsAgain = () => {
     setTooltipsHidden(false);
   };
+
+  const handleControlsMouseEnter = () => {
+    if (!tooltipSessionActive) {
+      tooltipSessionTimerRef.current = setTimeout(
+        () => setTooltipSessionActive(true),
+        850,
+      );
+    }
+  };
+
+  const handleControlsMouseLeave = () => {
+    if (tooltipSessionTimerRef.current) {
+      clearTimeout(tooltipSessionTimerRef.current);
+      tooltipSessionTimerRef.current = null;
+    }
+    setTooltipSessionActive(false);
+    showTooltipsAgain();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (tooltipSessionTimerRef.current)
+        clearTimeout(tooltipSessionTimerRef.current);
+    };
+  }, []);
 
   // Tooltip component that renders via portal to escape overflow clipping
   const Tooltip = ({
@@ -3032,8 +3061,9 @@ export function PageFeedbackToolbarCSS({
               toolbarPosition && toolbarPosition.y < 100
                 ? styles.tooltipBelow
                 : ""
-            } ${tooltipsHidden || showSettings ? styles.tooltipsHidden : ""}`}
-            onMouseLeave={showTooltipsAgain}
+            } ${tooltipsHidden || showSettings ? styles.tooltipsHidden : ""} ${tooltipSessionActive ? styles.tooltipsInSession : ""}`}
+            onMouseEnter={handleControlsMouseEnter}
+            onMouseLeave={handleControlsMouseLeave}
           >
             <div
               className={`${styles.buttonWrapper} ${
