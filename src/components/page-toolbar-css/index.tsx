@@ -60,6 +60,8 @@ import {
   saveSessionId,
   clearSessionId,
   saveAnnotationsWithSyncMarker,
+  loadToolbarHidden,
+  saveToolbarHidden,
 } from "../../utils/storage";
 import {
   createSession,
@@ -468,6 +470,8 @@ export function PageFeedbackToolbarCSS({
   const [isActive, setIsActive] = useState(false);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [showMarkers, setShowMarkers] = useState(true);
+  const [isToolbarHidden, setIsToolbarHidden] = useState(() => loadToolbarHidden());
+  const [isToolbarHiding, setIsToolbarHiding] = useState(false);
 
   // Stop native events from bubbling past document.body when they originate
   // inside the toolbar portal. Without this, clicks on the toolbar propagate to
@@ -1256,6 +1260,18 @@ export function PageFeedbackToolbarCSS({
       syncLocalAnnotations();
     }
   }, [connectionStatus, endpoint, mounted, currentSessionId, pathname]);
+
+  const hideToolbarTemporarily = useCallback(() => {
+    if (isToolbarHiding) return;
+    setIsToolbarHiding(true);
+    setShowSettings(false);
+    setIsActive(false);
+    originalSetTimeout(() => {
+      saveToolbarHidden(true);
+      setIsToolbarHidden(true);
+      setIsToolbarHiding(false);
+    }, 400);
+  }, [isToolbarHiding]);
 
   // Demo annotations
   useEffect(() => {
@@ -2959,6 +2975,7 @@ export function PageFeedbackToolbarCSS({
   ]);
 
   if (!mounted) return null;
+  if (isToolbarHidden) return null;
 
   const hasAnnotations = annotations.length > 0;
 
@@ -3035,7 +3052,7 @@ export function PageFeedbackToolbarCSS({
       >
         {/* Morphing container */}
         <div
-          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
+          className={`${styles.toolbarContainer} ${!isDarkMode ? styles.light : ""} ${isActive ? styles.expanded : styles.collapsed} ${showEntranceAnimation ? styles.entrance : ""} ${isToolbarHiding ? styles.hiding : ""} ${isDraggingToolbar ? styles.dragging : ""} ${!settings.webhooksEnabled && (isValidUrl(settings.webhookUrl) || isValidUrl(webhookUrl || "")) ? styles.serverConnected : ""}`}
           onClick={
             !isActive
               ? (e) => {
@@ -3396,6 +3413,31 @@ export function PageFeedbackToolbarCSS({
                             reactEnabled: !s.reactEnabled,
                           }))
                         }
+                      />
+                      <span className={styles.toggleSlider} />
+                    </label>
+                  </div>
+
+                  <div className={`${styles.settingsRow} ${styles.settingsRowMarginTop}`}>
+                    <div
+                      className={`${styles.settingsLabel} ${!isDarkMode ? styles.light : ""}`}
+                    >
+                      Hide Until Restart
+                      <Tooltip content="Hides the toolbar until you open a new tab">
+                        <span className={styles.helpIcon}>
+                          <IconHelp size={20} />
+                        </span>
+                      </Tooltip>
+                    </div>
+                    <label className={styles.toggleSwitch}>
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            hideToolbarTemporarily();
+                          }
+                        }}
                       />
                       <span className={styles.toggleSlider} />
                     </label>
