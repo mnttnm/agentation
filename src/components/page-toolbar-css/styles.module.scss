@@ -7,6 +7,28 @@ svg[fill="none"] {
   fill: none !important;
 }
 
+// Protect toolbar elements from host page global CSS.
+// The toolbar is portaled to document.body, so global rules like
+// `button { background: black }` leak in. :where() zeroes specificity
+// so our component class styles (0,1,0) always win by source order.
+// Only reset cosmetic properties that global CSS commonly overrides —
+// avoid `all: unset` which also nukes layout props (box-sizing,
+// appearance, line-height) that component styles don't re-set.
+.toolbar :where(button, input, select, textarea, label) {
+  background: unset;
+  border: unset;
+  border-radius: unset;
+  padding: unset;
+  margin: unset;
+  color: unset;
+  font: unset;
+  letter-spacing: unset;
+  text-transform: unset;
+  text-decoration: unset;
+  box-shadow: unset;
+  outline: unset;
+}
+
 $blue: #3c82f7;
 $red: #ff3b30;
 $green: #34c759;
@@ -1306,6 +1328,8 @@ $green: #34c759;
   }
 
   &:hover {
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+
     svg {
       opacity: 1;
     }
@@ -1314,6 +1338,10 @@ $green: #34c759;
   &.light {
     color: rgba(0, 0, 0, 0.85);
     border-bottom-color: rgba(0, 0, 0, 0.08);
+
+    &:hover {
+      border-bottom-color: rgba(0, 0, 0, 0.08);
+    }
   }
 }
 
