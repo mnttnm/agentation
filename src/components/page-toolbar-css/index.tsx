@@ -73,6 +73,11 @@ import {
 } from "../../utils/sync";
 import { getReactComponentName } from "../../utils/react-detection";
 import {
+  getSourceLocation,
+  findNearestComponentSource,
+  formatSourceLocation,
+} from "../../utils/source-location";
+import {
   freeze as freezeAll,
   unfreeze as unfreezeAll,
   originalSetTimeout,
@@ -295,6 +300,15 @@ function getActiveButtonStyle(
   };
 }
 
+function detectSourceFile(element: Element): string | undefined {
+  const result = getSourceLocation(element as HTMLElement);
+  const loc = result.found ? result : findNearestComponentSource(element as HTMLElement);
+  if (loc.found && loc.source) {
+    return formatSourceLocation(loc.source, "path");
+  }
+  return undefined;
+}
+
 function generateOutput(
   annotations: Annotation[],
   pathname: string,
@@ -328,7 +342,7 @@ function generateOutput(
 
   annotations.forEach((a, i) => {
     if (detailLevel === "compact") {
-      output += `${i + 1}. **${a.element}**: ${a.comment}`;
+      output += `${i + 1}. **${a.element}**${a.sourceFile ? ` (${a.sourceFile})` : ""}: ${a.comment}`;
       if (a.selectedText) {
         output += ` (re: "${a.selectedText.slice(0, 30)}${a.selectedText.length > 30 ? "..." : ""}")`;
       }
@@ -364,6 +378,9 @@ function generateOutput(
       if (a.nearbyElements) {
         output += `**Nearby Elements:** ${a.nearbyElements}\n`;
       }
+      if (a.sourceFile) {
+        output += `**Source:** ${a.sourceFile}\n`;
+      }
       if (a.reactComponents) {
         output += `**React:** ${a.reactComponents}\n`;
       }
@@ -372,6 +389,10 @@ function generateOutput(
       // Standard and detailed modes
       output += `### ${i + 1}. ${a.element}\n`;
       output += `**Location:** ${a.elementPath}\n`;
+
+      if (a.sourceFile) {
+        output += `**Source:** ${a.sourceFile}\n`;
+      }
 
       // React components in both standard and detailed
       if (a.reactComponents) {
@@ -517,6 +538,7 @@ export function PageFeedbackToolbarCSS({
     computedStylesObj?: Record<string, string>;
     nearbyElements?: string;
     reactComponents?: string;
+    sourceFile?: string;
     elementBoundingBoxes?: Array<{
       x: number;
       y: number;
@@ -1426,6 +1448,7 @@ export function PageFeedbackToolbarCSS({
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
         reactComponents: firstItem.reactComponents,
+        sourceFile: detectSourceFile(firstEl),
       });
     } else {
       // Multiple elements - multi-select annotation
@@ -1484,6 +1507,7 @@ export function PageFeedbackToolbarCSS({
         nearbyElements: getNearbyElements(firstEl),
         cssClasses: getElementClasses(firstEl),
         nearbyText: getNearbyText(firstEl),
+        sourceFile: detectSourceFile(firstEl),
       });
     }
 
@@ -1741,6 +1765,7 @@ export function PageFeedbackToolbarCSS({
         computedStylesObj,
         nearbyElements: getNearbyElements(elementUnder),
         reactComponents: reactComponents ?? undefined,
+        sourceFile: detectSourceFile(elementUnder),
         targetElement: elementUnder, // Store for live position queries
       });
       setHoverInfo(null);
@@ -2190,6 +2215,7 @@ export function PageFeedbackToolbarCSS({
             nearbyElements: getNearbyElements(firstElement),
             cssClasses: getElementClasses(firstElement),
             nearbyText: getNearbyText(firstElement),
+            sourceFile: detectSourceFile(firstElement),
           });
         } else {
           // No elements selected, but allow annotation on empty area
@@ -2289,6 +2315,7 @@ export function PageFeedbackToolbarCSS({
         computedStyles: pendingAnnotation.computedStyles,
         nearbyElements: pendingAnnotation.nearbyElements,
         reactComponents: pendingAnnotation.reactComponents,
+        sourceFile: pendingAnnotation.sourceFile,
         elementBoundingBoxes: pendingAnnotation.elementBoundingBoxes,
         // Protocol fields for server sync
         ...(endpoint && currentSessionId

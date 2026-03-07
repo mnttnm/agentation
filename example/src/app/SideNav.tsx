@@ -454,7 +454,6 @@ export function SideNav() {
     { href: "/changelog", label: "Changelog" },
     { href: "/blog", label: "Blog" },
     { href: "/faq", label: "FAQ" },
-    { href: "/css-isolation", label: "CSS Isolation" },
   ];
 
   return (
