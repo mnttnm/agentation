@@ -3,12 +3,13 @@
 // =============================================================================
 
 // Google Fonts
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600&display=swap");
 
 // CSS Variables
 :root {
-  --font-primary: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-primary:
+    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   --font-title: "IBM Plex Serif", Georgia, "Times New Roman", serif;
 
   --body-color: #111;
@@ -59,7 +60,12 @@ body {
 }
 
 // Typography
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: rgba(0, 0, 0, 0.85);
   position: relative;
 }
@@ -113,7 +119,7 @@ h2 {
   gap: 0.75rem;
 
   &::after {
-    content: '';
+    content: "";
     flex: 1;
     height: 1px;
     background: rgba(0, 0, 0, 0.08);
@@ -134,7 +140,8 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
-img, svg {
+img,
+svg {
   display: inline-block;
   max-width: 100%;
   height: auto;
@@ -209,21 +216,23 @@ button {
 
   .nav-link {
     font-size: 0.75rem;
-    font-variation-settings: 'wght' 450;
+    font-variation-settings: "wght" 450;
     color: rgba(0, 0, 0, 0.35);
-    transition: color 0.15s ease, font-variation-settings 0.25s ease;
+    transition:
+      color 0.15s ease,
+      font-variation-settings 0.25s ease;
     display: flex;
     align-items: center;
     gap: 0.375rem;
 
     &:hover {
       color: rgba(0, 0, 0, 0.55);
-      font-variation-settings: 'wght' 550;
+      font-variation-settings: "wght" 550;
     }
 
     &.active {
       color: rgba(0, 0, 0, 0.8);
-      font-variation-settings: 'wght' 550;
+      font-variation-settings: "wght" 550;
     }
   }
 
@@ -231,7 +240,7 @@ button {
     font-size: 0.5625rem;
     color: #3b82f6;
     font-weight: 500;
-    font-variation-settings: 'wght' 500;
+    font-variation-settings: "wght" 500;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     transform: translateY(0.5px);
@@ -239,7 +248,7 @@ button {
 
   .nav-section {
     font-size: 0.625rem;
-    font-variation-settings: 'wght' 500;
+    font-variation-settings: "wght" 500;
     color: rgba(0, 0, 0, 0.25);
     margin-top: 0.75rem;
     margin-bottom: 0.125rem;
@@ -283,8 +292,12 @@ button {
   }
 
   @keyframes navVersionFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   // Hide on smaller screens where it would overlap content
@@ -327,7 +340,7 @@ button {
       @media (max-width: 500px) {
         flex-direction: column;
         align-items: flex-start;
-        row-gap: 12px;
+        row-gap: 8px;
         margin-bottom: 12px;
       }
     }
@@ -384,7 +397,8 @@ button {
     font-style: italic;
   }
 
-  ul, ol {
+  ul,
+  ol {
     padding-left: 1rem;
     display: flex;
     flex-direction: column;
@@ -419,11 +433,13 @@ button {
   }
 
   // Add spacing between paragraphs and lists
-  p + ul, p + ol {
+  p + ul,
+  p + ol {
     margin-top: 0.5rem;
   }
 
-  ul + p, ol + p {
+  ul + p,
+  ol + p {
     margin-top: 0.625rem;
   }
 
@@ -452,7 +468,9 @@ button {
   }
 
   // Inline links in article content
-  p a, li a, td a {
+  p a,
+  li a,
+  td a {
     color: var(--hyperlink-color);
     transition: color 0.15s ease;
 
@@ -615,7 +633,9 @@ button {
     background: white;
     color: #111;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    transition: background 0.15s ease, box-shadow 0.15s ease;
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease;
 
     &:hover {
       background: #fafafa;
@@ -679,7 +699,7 @@ button {
   position: relative;
   height: 100%;
   width: 30%;
-  background: linear-gradient(90deg, #4C74FF, #7B9FFF);
+  background: linear-gradient(90deg, #4c74ff, #7b9fff);
   border-radius: 2px;
   animation: progress-move 1.4s ease-in-out infinite alternate;
 }
@@ -824,9 +844,11 @@ button {
 
   .mobile-nav-link {
     font-size: 0.75rem;
-    font-variation-settings: 'wght' 450;
+    font-variation-settings: "wght" 450;
     color: rgba(0, 0, 0, 0.35);
-    transition: color 0.15s ease, font-variation-settings 0.25s ease;
+    transition:
+      color 0.15s ease,
+      font-variation-settings 0.25s ease;
 
     &:hover {
       color: rgba(0, 0, 0, 0.55);
@@ -834,20 +856,28 @@ button {
 
     &.active {
       color: rgba(0, 0, 0, 0.8);
-      font-variation-settings: 'wght' 550;
+      font-variation-settings: "wght" 550;
     }
   }
 }
 
 // Mobile typed logo animations
 @keyframes mobileTypeChar {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes mobileBunnyFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .mobile-typed-char {
@@ -917,7 +947,7 @@ button {
 
   // Track (gray background bar)
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     inset-block: 0.375rem 0;
     inset-inline-start: 0;
@@ -928,7 +958,7 @@ button {
 
   // Active indicator (animated bar)
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     inset-block: 0;
     inset-inline-start: 0;
@@ -957,11 +987,11 @@ button {
     transition-property: color, font-variation-settings;
 
     &:hover {
-      font-variation-settings: 'wght' 500;
+      font-variation-settings: "wght" 500;
       color: rgba(0, 0, 0, 0.55);
     }
 
-    &[aria-current='true'] {
+    &[aria-current="true"] {
       font-weight: 500;
       color: rgba(0, 0, 0, 0.85);
     }
@@ -1061,7 +1091,9 @@ button {
   border-radius: 0.5rem;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 
   &:hover {
     border-color: rgba(0, 0, 0, 0.12);
@@ -1099,8 +1131,13 @@ button {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .show-on-mobile {
