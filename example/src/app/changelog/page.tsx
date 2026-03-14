@@ -30,6 +30,14 @@ function isMajorVersion(version: string): boolean {
 
 const releases: Release[] = [
   {
+    version: "2.3.3",
+    date: "March 14, 2026",
+    changes: [
+      { type: "improved", text: "Marker colors now use Display P3 on wide-gamut screens, with sRGB fallback" },
+      { type: "fixed", text: <><code>className</code> prop can now override toolbar positioning without <code>!important</code></> },
+    ],
+  },
+  {
     version: "2.3.2",
     date: "March 9, 2026",
     changes: [
