@@ -270,18 +270,11 @@
     0 2px 8px rgba(0, 0, 0, 0.2),
     0 4px 16px rgba(0, 0, 0, 0.1);
   pointer-events: auto;
-  cursor: grab;
 
   // Animated properties
   transition:
     width 0.4s cubic-bezier(0.19, 1, 0.22, 1),
     transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-
-  &.dragging {
-    // Remove transition while dragging for immediate feedback
-    transition: width 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-    cursor: grabbing;
-  }
 
   &.entrance {
     animation: toolbarEnter 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
