@@ -1,23 +1,10 @@
-import { COLOR_OPTIONS, type OutputDetailLevel } from "..";
+import { COLOR_OPTIONS, ToolbarSettings } from "..";
 import { OUTPUT_DETAIL_OPTIONS } from "../../../utils/generate-output";
 import { HelpTooltip } from "../../help-tooltip";
 import { IconChevronLeft, IconMoon, IconSun } from "../../icons";
 import { Switch } from "../../switch";
 import { CheckboxField } from "./checkbox-field";
 import styles from "./styles.module.scss";
-
-type MarkerClickBehavior = "edit" | "delete";
-
-type ToolbarSettings = {
-  outputDetail: OutputDetailLevel;
-  autoClearAfterCopy: boolean;
-  annotationColorId: string;
-  blockInteractions: boolean;
-  reactEnabled: boolean;
-  markerClickBehavior: MarkerClickBehavior;
-  webhookUrl: string;
-  webhooksEnabled: boolean;
-};
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
@@ -174,7 +161,6 @@ export function SettingsPanel({
                 onChange={(e) => {
                   if (e.target.checked) onHideToolbar();
                 }}
-                disabled={!isDevMode}
               />
             </div>
           </div>

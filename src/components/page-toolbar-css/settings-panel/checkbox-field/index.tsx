@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Checkbox } from "../../../checkbox";
-import styles from "./styles.module.scss";
 import { HelpTooltip } from "../../../help-tooltip";
+import styles from "./styles.module.scss";
 
 interface CheckboxFieldProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string;
