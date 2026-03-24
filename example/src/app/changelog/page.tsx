@@ -30,6 +30,13 @@ function isMajorVersion(version: string): boolean {
 
 const releases: Release[] = [
   {
+    version: "3.0.1",
+    date: "March 24, 2026",
+    changes: [
+      { type: "fixed", text: "Fixed logo display on npm and settings panel" },
+    ],
+  },
+  {
     version: "3.0.0",
     date: "March 24, 2026",
     summary: <>Show your agent where things go. <a href="/blog/layout-mode" className="styled-link">Layout mode</a> lets you place components, rearrange sections, and wireframe new pages. Your agent gets coordinates and dimensions instead of a paragraph of directions.</>,
