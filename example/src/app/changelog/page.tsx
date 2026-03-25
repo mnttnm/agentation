@@ -30,6 +30,14 @@ function isMajorVersion(version: string): boolean {
 
 const releases: Release[] = [
   {
+    version: "3.0.2",
+    date: "March 24, 2026",
+    changes: [
+      { type: "fixed", text: "Layout mode animations no longer freeze when the toolbar pauses page animations" },
+      { type: "fixed", text: "Annotation textarea, settings panel, and color swatches no longer overflow their containers" },
+    ],
+  },
+  {
     version: "3.0.1",
     date: "March 24, 2026",
     changes: [
