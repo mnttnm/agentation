@@ -262,6 +262,38 @@ function isElementFixed(element: HTMLElement): boolean {
   return false;
 }
 
+function escapeSelectorPart(value: string): string {
+  if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(value);
+  return value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+}
+
+function getTargetSelector(element: HTMLElement): string {
+  const parts: string[] = [];
+  let current: HTMLElement | null = element;
+
+  while (current && current !== document.body) {
+    const tag = current.tagName.toLowerCase();
+
+    if (current.id) {
+      parts.unshift(`${tag}#${escapeSelectorPart(current.id)}`);
+      return parts.join(" > ");
+    }
+
+    const parent: HTMLElement | null = current.parentElement;
+    if (!parent) break;
+
+    const currentTagName = current.tagName;
+    const index =
+      Array.from(parent.children)
+        .filter((child) => child.tagName === currentTagName)
+        .indexOf(current) + 1;
+    parts.unshift(`${tag}:nth-of-type(${Math.max(index, 1)})`);
+    current = parent;
+  }
+
+  return parts.length > 0 ? `body > ${parts.join(" > ")}` : "";
+}
+
 function isRenderableAnnotation(annotation: Annotation): boolean {
   return annotation.status !== "resolved" && annotation.status !== "dismissed";
 }
@@ -390,6 +422,8 @@ export function PageFeedbackToolbarCSS({
     nearbyElements?: string;
     reactComponents?: string;
     sourceFile?: string;
+    targetSelector?: string;
+    anchorOffset?: { x: number; y: number };
     elementBoundingBoxes?: Array<{
       x: number;
       y: number;
@@ -424,6 +458,7 @@ export function PageFeedbackToolbarCSS({
     HTMLElement[]
   >([]); // For cmd+shift+click multi-select
   const [scrollY, setScrollY] = useState(0);
+  const [layoutRevision, setLayoutRevision] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
@@ -629,9 +664,53 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   const popupRef = useRef<AnnotationPopupCSSHandle>(null);
   const editPopupRef = useRef<AnnotationPopupCSSHandle>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof originalSetTimeout> | null>(null);
+  const annotationTargetsRef = useRef<Map<string, HTMLElement>>(new Map());
 
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
+
+  const resolveAnnotationTarget = useCallback((annotation: Annotation): HTMLElement | null => {
+    const cached = annotationTargetsRef.current.get(annotation.id);
+    if (cached && document.contains(cached)) return cached;
+
+    if (!annotation.targetSelector) return null;
+
+    try {
+      const target = document.querySelector(annotation.targetSelector) as HTMLElement | null;
+      if (target) {
+        annotationTargetsRef.current.set(annotation.id, target);
+      }
+      return target;
+    } catch {
+      return null;
+    }
+  }, [layoutRevision]);
+
+  const getLiveAnnotation = useCallback((annotation: Annotation): Annotation => {
+    const target = resolveAnnotationTarget(annotation);
+    if (!target) return annotation;
+
+    const rect = target.getBoundingClientRect();
+    const offset = annotation.anchorOffset ?? { x: 0.5, y: 0.5 };
+    const offsetX = Math.min(1, Math.max(0, offset.x)) * rect.width;
+    const offsetY = Math.min(1, Math.max(0, offset.y)) * rect.height;
+    const clientX = rect.left + offsetX;
+    const clientY = rect.top + offsetY;
+    const targetIsFixed = isElementFixed(target);
+
+    return {
+      ...annotation,
+      isFixed: targetIsFixed,
+      x: window.innerWidth > 0 ? (clientX / window.innerWidth) * 100 : annotation.x,
+      y: targetIsFixed ? clientY : clientY + window.scrollY,
+      boundingBox: {
+        x: rect.left,
+        y: targetIsFixed ? rect.top : rect.top + window.scrollY,
+        width: rect.width,
+        height: rect.height,
+      },
+    };
+  }, [resolveAnnotationTarget]);
 
   // Handle showSettings changes with exit animation
   useEffect(() => {
@@ -1198,6 +1277,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
   useEffect(() => {
     const handleScroll = () => {
       setScrollY(window.scrollY);
+      setLayoutRevision((value) => value + 1);
       setIsScrolling(true);
 
       if (scrollTimeoutRef.current) {
@@ -1210,8 +1290,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
+    document.addEventListener("scroll", handleScroll, { passive: true, capture: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("scroll", handleScroll, true);
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
@@ -1692,6 +1774,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         },
         isFixed,
         fullPath: getFullElementPath(firstEl),
+        targetSelector: getTargetSelector(firstEl),
+        anchorOffset: { x: 0.5, y: 0.5 },
         accessibility: getAccessibilityInfo(firstEl),
         computedStyles: getForensicComputedStyles(firstEl),
         computedStylesObj: getDetailedComputedStyles(firstEl),
@@ -1752,6 +1836,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         multiSelectElements: pendingMultiSelectElements.map((item) => item.element),
         targetElement: lastEl, // Anchor marker/popup to last clicked element
         fullPath: getFullElementPath(firstEl),
+        targetSelector: getTargetSelector(lastEl),
+        anchorOffset: { x: 0.5, y: 0.5 },
         accessibility: getAccessibilityInfo(firstEl),
         computedStyles: getForensicComputedStyles(firstEl),
         computedStylesObj: getDetailedComputedStyles(firstEl),
@@ -1881,6 +1967,13 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     setHoveredTargetElement(null);
     setHoveredTargetElements([]);
 
+    const resolvedTarget = resolveAnnotationTarget(annotation);
+    if (resolvedTarget) {
+      setEditingTargetElement(resolvedTarget);
+      setEditingTargetElements([]);
+      return;
+    }
+
     // Try to find elements at the annotation's position(s) for live tracking
     if (annotation.elementBoundingBoxes?.length) {
       // Cmd+shift+click: find element at each bounding box center
@@ -1921,7 +2014,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       setEditingTargetElement(null);
       setEditingTargetElements([]);
     }
-  }, []);
+  }, [resolveAnnotationTarget]);
 
   // Handle click
   useEffect(() => {
@@ -2024,6 +2117,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
       const isFixed = isElementFixed(elementUnder);
       const y = isFixed ? e.clientY : e.clientY + window.scrollY;
+      const anchorOffset = {
+        x: rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5,
+        y: rect.height > 0 ? (e.clientY - rect.top) / rect.height : 0.5,
+      };
 
       const selection = window.getSelection();
       let selectedText: string | undefined;
@@ -2052,6 +2149,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         cssClasses: getElementClasses(elementUnder),
         isFixed,
         fullPath: getFullElementPath(elementUnder),
+        targetSelector: getTargetSelector(elementUnder),
+        anchorOffset,
         accessibility: getAccessibilityInfo(elementUnder),
         computedStyles: computedStylesStr,
         computedStylesObj,
@@ -2505,6 +2604,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             isMultiSelect: true,
             // Forensic data from first element
             fullPath: getFullElementPath(firstElement),
+            targetSelector: getTargetSelector(firstElement),
+            anchorOffset: { x: 0.5, y: 0.5 },
             accessibility: getAccessibilityInfo(firstElement),
             computedStyles: firstElementComputedStylesStr,
             computedStylesObj: firstElementComputedStyles,
@@ -2607,6 +2708,8 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         isMultiSelect: pendingAnnotation.isMultiSelect,
         isFixed: pendingAnnotation.isFixed,
         fullPath: pendingAnnotation.fullPath,
+        targetSelector: pendingAnnotation.targetSelector,
+        anchorOffset: pendingAnnotation.anchorOffset,
         accessibility: pendingAnnotation.accessibility,
         computedStyles: pendingAnnotation.computedStyles,
         nearbyElements: pendingAnnotation.nearbyElements,
@@ -2625,6 +2728,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
             }
           : {}),
       };
+
+      if (pendingAnnotation.targetElement) {
+        annotationTargetsRef.current.set(newAnnotation.id, pendingAnnotation.targetElement);
+      }
 
       setAnnotations((prev) => [...prev, newAnnotation]);
       // Prevent immediate hover on newly added marker
@@ -2656,6 +2763,11 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
           .then((serverAnnotation) => {
             // Update local annotation with server-assigned ID
             if (serverAnnotation.id !== newAnnotation.id) {
+              const target = annotationTargetsRef.current.get(newAnnotation.id);
+              if (target) {
+                annotationTargetsRef.current.delete(newAnnotation.id);
+                annotationTargetsRef.current.set(serverAnnotation.id, target);
+              }
               setAnnotations((prev) =>
                 prev.map((a) =>
                   a.id === newAnnotation.id
@@ -2733,6 +2845,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
       // Wait for exit animation then remove
       originalSetTimeout(() => {
+        annotationTargetsRef.current.delete(id);
         setAnnotations((prev) => prev.filter((a) => a.id !== id));
         setExitingMarkers((prev) => {
           const next = new Set(prev);
@@ -2762,6 +2875,13 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       }
 
       setHoveredMarkerId(annotation.id);
+
+      const resolvedTarget = resolveAnnotationTarget(annotation);
+      if (resolvedTarget) {
+        setHoveredTargetElement(resolvedTarget);
+        setHoveredTargetElements([]);
+        return;
+      }
 
       // Find elements at the annotation's position(s) for live tracking
       if (annotation.elementBoundingBoxes?.length) {
@@ -2809,7 +2929,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         setHoveredTargetElements([]);
       }
     },
-    [],
+    [resolveAnnotationTarget],
   );
 
   // Update annotation (edit mode submit)
@@ -2931,6 +3051,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
 
     const totalAnimationTime = count * 30 + 200;
     originalSetTimeout(() => {
+      annotationTargetsRef.current.clear();
       setAnnotations([]);
       setAnimatedMarkers(new Set()); // Reset animated markers
       localStorage.removeItem(getStorageKey(pathname));
@@ -4184,6 +4305,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       <div className={styles.markersLayer} data-feedback-toolbar>
         {markersVisible &&
           visibleAnnotations
+            .map(getLiveAnnotation)
             .filter((a) => !a.isFixed)
             .map((annotation, layerIndex, arr) => (
               <AnnotationMarker
@@ -4226,6 +4348,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       <div className={styles.fixedMarkersLayer} data-feedback-toolbar>
         {markersVisible &&
           visibleAnnotations
+            .map(getLiveAnnotation)
             .filter((a) => a.isFixed)
             .map((annotation, layerIndex, arr) => (
               <AnnotationMarker
@@ -4501,11 +4624,23 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                       )}
 
               {(() => {
-                // Use stored coordinates - they match what will be saved
-                const markerX = pendingAnnotation.x;
-                const markerY = pendingAnnotation.isFixed
+                let markerX = pendingAnnotation.x;
+                let markerY = pendingAnnotation.isFixed
                   ? pendingAnnotation.y
                   : pendingAnnotation.y - scrollY;
+
+                if (
+                  pendingAnnotation.targetElement &&
+                  document.contains(pendingAnnotation.targetElement)
+                ) {
+                  const rect = pendingAnnotation.targetElement.getBoundingClientRect();
+                  const offset = pendingAnnotation.anchorOffset ?? { x: 0.5, y: 0.5 };
+                  markerX =
+                    window.innerWidth > 0
+                      ? ((rect.left + rect.width * offset.x) / window.innerWidth) * 100
+                      : markerX;
+                  markerY = rect.top + rect.height * offset.y;
+                }
 
                 return (
                   <>
@@ -4666,9 +4801,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                     : "var(--agentation-color-accent)"
                 }
                 style={(() => {
-                  const markerY = editingAnnotation.isFixed
-                    ? editingAnnotation.y
-                    : editingAnnotation.y - scrollY;
+                  const liveAnnotation = getLiveAnnotation(editingAnnotation);
+                  const markerY = liveAnnotation.isFixed
+                    ? liveAnnotation.y
+                    : liveAnnotation.y - scrollY;
                   return {
                     // Popup is 280px wide, centered with translateX(-50%), so 140px each side
                     // Clamp so popup stays 20px from viewport edges
@@ -4676,7 +4812,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                       160,
                       Math.min(
                         window.innerWidth - 160,
-                        (editingAnnotation.x / 100) * window.innerWidth,
+                        (liveAnnotation.x / 100) * window.innerWidth,
                       ),
                     ),
                     // Position popup above or below marker to keep marker visible
