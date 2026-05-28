@@ -17,6 +17,8 @@ export type Annotation = {
   nearbyElements?: string;
   computedStyles?: string;
   fullPath?: string;
+  targetSelector?: string; // Runtime selector used to re-anchor markers to the live DOM
+  anchorOffset?: { x: number; y: number }; // Click offset inside target element, as ratios 0..1
   accessibility?: string;
   isMultiSelect?: boolean; // true if created via drag selection
   isFixed?: boolean; // true if element has fixed/sticky positioning (marker stays fixed)
@@ -106,4 +108,3 @@ export type ThreadMessage = {
   content: string;
   timestamp: number;
 };
-
