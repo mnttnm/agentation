@@ -267,7 +267,44 @@ function escapeSelectorPart(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
 }
 
+function escapeAttributeValue(value: string): string {
+  return value.replace(/["\\]/g, "\\$&");
+}
+
+function getStableAnchorElement(element: HTMLElement): HTMLElement {
+  return (
+    element.closest("[data-agentation-anchor]") as HTMLElement | null
+  ) ?? element;
+}
+
+function getStableAnchorSelector(element: HTMLElement): string | null {
+  const anchor = element.closest("[data-agentation-anchor]") as HTMLElement | null;
+  const value = anchor?.getAttribute("data-agentation-anchor");
+  if (!anchor || !value) return null;
+  return `[data-agentation-anchor="${escapeAttributeValue(value)}"]`;
+}
+
+function selectBestTarget(selector: string): HTMLElement | null {
+  const targets = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
+  if (targets.length === 0) return null;
+  if (targets.length === 1) return targets[0];
+
+  return targets.find((target) => {
+    const rect = target.getBoundingClientRect();
+    const style = window.getComputedStyle(target);
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      style.visibility !== "hidden" &&
+      style.display !== "none"
+    );
+  }) ?? targets[0];
+}
+
 function getTargetSelector(element: HTMLElement): string {
+  const stableSelector = getStableAnchorSelector(element);
+  if (stableSelector) return stableSelector;
+
   const parts: string[] = [];
   let current: HTMLElement | null = element;
 
@@ -676,7 +713,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     if (!annotation.targetSelector) return null;
 
     try {
-      const target = document.querySelector(annotation.targetSelector) as HTMLElement | null;
+      const target = selectBestTarget(annotation.targetSelector);
       if (target) {
         annotationTargetsRef.current.set(annotation.id, target);
       }
@@ -2108,14 +2145,15 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       const elementUnder = deepElementFromPoint(e.clientX, e.clientY);
       if (!elementUnder) return;
 
+      const anchorElement = getStableAnchorElement(elementUnder);
       const { name, path, reactComponents } = identifyElementWithReact(
         elementUnder,
         effectiveReactMode,
       );
-      const rect = elementUnder.getBoundingClientRect();
+      const rect = anchorElement.getBoundingClientRect();
       const x = (e.clientX / window.innerWidth) * 100;
 
-      const isFixed = isElementFixed(elementUnder);
+      const isFixed = isElementFixed(anchorElement);
       const y = isFixed ? e.clientY : e.clientY + window.scrollY;
       const anchorOffset = {
         x: rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5,
@@ -2149,7 +2187,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         cssClasses: getElementClasses(elementUnder),
         isFixed,
         fullPath: getFullElementPath(elementUnder),
-        targetSelector: getTargetSelector(elementUnder),
+        targetSelector: getTargetSelector(anchorElement),
         anchorOffset,
         accessibility: getAccessibilityInfo(elementUnder),
         computedStyles: computedStylesStr,
@@ -2157,7 +2195,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         nearbyElements: getNearbyElements(elementUnder),
         reactComponents: reactComponents ?? undefined,
         sourceFile: detectSourceFile(elementUnder),
-        targetElement: elementUnder, // Store for live position queries
+        targetElement: anchorElement, // Store for live position queries
       });
       setHoverInfo(null);
     };
