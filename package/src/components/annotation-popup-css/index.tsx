@@ -57,6 +57,8 @@ export interface AnnotationPopupCSSProps {
   lightMode?: boolean;
   /** Computed styles for the selected element */
   computedStyles?: Record<string, string>;
+  /** Brief keyboard navigation hint shown while selecting an element */
+  navigationHint?: string;
 }
 
 export interface AnnotationPopupCSSHandle {
@@ -85,6 +87,7 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
       isExiting = false,
       lightMode = false,
       computedStyles,
+      navigationHint,
     },
     ref
   ) {
@@ -230,6 +233,10 @@ export const AnnotationPopupCSS = forwardRef<AnnotationPopupCSSHandle, Annotatio
           )}
           {timestamp && <span className={styles.timestamp}>{timestamp}</span>}
         </div>
+
+        {navigationHint && (
+          <div className={styles.navigationHint}>{navigationHint}</div>
+        )}
 
         {/* Collapsible computed styles section - uses grid-template-rows for smooth animation */}
         {computedStyles && Object.keys(computedStyles).length > 0 && (

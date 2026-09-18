@@ -129,6 +129,13 @@
   flex: 1;
 }
 
+.navigationHint {
+  margin: -0.15rem 0 0.55rem;
+  font-size: 0.625rem;
+  color: rgba(255, 255, 255, 0.42);
+  white-space: nowrap;
+}
+
 .headerToggle {
   display: flex;
   align-items: center;
@@ -368,6 +375,10 @@
 
   .element {
     color: rgba(0, 0, 0, 0.6);
+  }
+
+  .navigationHint {
+    color: rgba(0, 0, 0, 0.45);
   }
 
   .timestamp {

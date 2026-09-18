@@ -21,6 +21,39 @@ afterEach(() => {
 });
 
 describe("PageFeedbackToolbarCSS", () => {
+  describe("DOM navigation shortcuts", () => {
+    it("selects the parent element with Alt+ArrowUp", async () => {
+      const handleAnnotation = vi.fn();
+      const { container } = render(
+        <>
+          <div id="parent">
+            <button id="child">Child</button>
+          </div>
+          <PageFeedbackToolbarCSS onAnnotationAdd={handleAnnotation} />
+        </>,
+      );
+      const child = container.querySelector("#child") as HTMLElement;
+      Object.defineProperty(document, "elementFromPoint", {
+        configurable: true,
+        writable: true,
+        value: vi.fn().mockReturnValue(child),
+      });
+
+      fireEvent.click(await screen.findByTitle("Start feedback mode"));
+      fireEvent.click(child, { clientX: 20, clientY: 20 });
+
+      const textarea = await screen.findByPlaceholderText("What should change?");
+      expect(screen.getByText(/Alt\+↑ parent/)).toBeTruthy();
+
+      fireEvent.keyDown(textarea, { key: "ArrowUp", altKey: true });
+      fireEvent.change(textarea, { target: { value: "Inspect parent" } });
+      fireEvent.click(screen.getByText("Add"));
+
+      await waitFor(() => expect(handleAnnotation).toHaveBeenCalledOnce());
+      expect(handleAnnotation.mock.calls[0][0].elementPath).toContain("#parent");
+    });
+  });
+
   describe("onAnnotationAdd callback", () => {
     it("should accept onAnnotationAdd prop without errors", () => {
       const handleAnnotation = vi.fn();
@@ -80,6 +113,83 @@ describe("PageFeedbackToolbarCSS", () => {
   });
 });
 
+describe("accessible names", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+  });
+
+  const renderToolbar = () => {
+    const { baseElement } = render(<PageFeedbackToolbarCSS />);
+    const toolbar = baseElement.querySelector("[data-feedback-toolbar]");
+    expect(toolbar).not.toBeNull();
+    return toolbar as HTMLElement;
+  };
+
+  // jsdom's selector engine chokes on React's ":r0:" auto-ids, so read the
+  // name off the element instead of going through getByRole's name matching.
+  const accessibleName = (el: Element) =>
+    (el.getAttribute("aria-label") ?? el.textContent ?? "").trim();
+
+  it("gives every toolbar button an accessible name", () => {
+    const toolbar = renderToolbar();
+    const buttons = [...toolbar.querySelectorAll("button")];
+
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) {
+      expect(accessibleName(button)).not.toBe("");
+    }
+  });
+
+  it("labels the named control buttons", () => {
+    const toolbar = renderToolbar();
+    const names = [...toolbar.querySelectorAll("button")].map(accessibleName);
+
+    for (const name of [
+      "Pause animations",
+      "Layout mode",
+      "Hide markers",
+      "Copy feedback",
+      "Send Annotations",
+      "Clear all",
+      "Settings",
+      "Exit",
+    ]) {
+      expect(names).toContain(name);
+    }
+  });
+
+  it("labels the settings switches and the brand link", () => {
+    const toolbar = renderToolbar();
+    const switches = [
+      ...toolbar.querySelectorAll('input[type="checkbox"]'),
+    ].filter((input) => !input.id);
+
+    expect(switches.length).toBeGreaterThan(0);
+    for (const input of switches) {
+      expect(accessibleName(input)).not.toBe("");
+    }
+
+    for (const link of toolbar.querySelectorAll("a")) {
+      expect(accessibleName(link)).not.toBe("");
+    }
+  });
+
+  it("does not nest the control buttons inside the collapsed button role", () => {
+    const toolbar = renderToolbar();
+    const collapsedToggle = toolbar.querySelector('[role="button"]');
+
+    expect(collapsedToggle).not.toBeNull();
+    expect(collapsedToggle!.querySelector("button")).toBeNull();
+  });
+});
+
 describe("Annotation type", () => {
   it("should include all required fields", () => {
     const annotation: Annotation = {
@@ -134,5 +244,84 @@ describe("Annotation type", () => {
     expect(annotation.accessibility).toBe("role=button, aria-label=Submit");
     expect(annotation.isMultiSelect).toBe(false);
     expect(annotation.isFixed).toBe(false);
+  });
+});
+
+describe("blockInteractions", () => {
+  it("does not let a picked click reach a delegated host handler", () => {
+    const onRowClick = vi.fn();
+    render(
+      <>
+        <table>
+          <tbody>
+            <tr onClick={onRowClick}>
+              <td>Cell</td>
+            </tr>
+          </tbody>
+        </table>
+        <PageFeedbackToolbarCSS />
+      </>
+    );
+
+    const cell = screen.getByText("Cell");
+    // jsdom has no layout; resolve the picked element to the clicked cell
+    document.elementFromPoint = () => cell;
+
+    // Activate feedback mode (blockInteractions defaults to true)
+    fireEvent.keyDown(document, { key: "f", ctrlKey: true, shiftKey: true });
+
+    fireEvent.click(cell);
+
+    expect(onRowClick).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-annotation-popup]")).not.toBeNull();
+  });
+});
+
+describe("modifier-click multi-select", () => {
+  it("opens the popup on modifier release even when the keydowns were never observed", () => {
+    render(
+      <>
+        <p>First</p>
+        <p>Second</p>
+        <PageFeedbackToolbarCSS />
+      </>
+    );
+    const first = screen.getByText("First");
+    const second = screen.getByText("Second");
+
+    // Modifiers are already held when feedback mode is activated
+    fireEvent.keyDown(document, { key: "f", ctrlKey: true, shiftKey: true });
+
+    document.elementFromPoint = () => first;
+    fireEvent.click(first, { metaKey: true, shiftKey: true });
+    document.elementFromPoint = () => second;
+    fireEvent.click(second, { metaKey: true, shiftKey: true });
+
+    expect(document.querySelector("[data-annotation-popup]")).toBeNull();
+
+    fireEvent.keyUp(document, { key: "Meta" });
+
+    expect(document.querySelector("[data-annotation-popup]")).not.toBeNull();
+  });
+});
+
+describe("keyboard shortcuts", () => {
+  it("leaves single-key shortcuts to the host page while the toolbar is collapsed", () => {
+    // Layout mode mounts a palette that observes its size; jsdom has no ResizeObserver
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    render(
+      <>
+        <div tabIndex={0} data-testid="editor" />
+        <PageFeedbackToolbarCSS />
+      </>
+    );
+    const editor = screen.getByTestId("editor");
+
+    // Collapsed: "l" is not intercepted (fireEvent returns false when defaultPrevented)
+    expect(fireEvent.keyDown(editor, { key: "l" })).toBe(true);
+
+    // Active: the same key is now a toolbar shortcut
+    fireEvent.keyDown(document, { key: "f", ctrlKey: true, shiftKey: true });
+    expect(fireEvent.keyDown(editor, { key: "l" })).toBe(false);
   });
 });
