@@ -33,13 +33,16 @@ describe("PageFeedbackToolbarCSS", () => {
         </>,
       );
       const child = container.querySelector("#child") as HTMLElement;
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(child);
+      Object.defineProperty(document, "elementFromPoint", {
+        configurable: true,
+        value: vi.fn().mockReturnValue(child),
+      });
 
       fireEvent.click(await screen.findByTitle("Start feedback mode"));
       fireEvent.click(child, { clientX: 20, clientY: 20 });
 
       const textarea = await screen.findByPlaceholderText("What should change?");
-      expect(screen.getByText(/Alt\+↑ parent/)).toBeInTheDocument();
+      expect(screen.getByText(/Alt\+↑ parent/)).toBeTruthy();
 
       fireEvent.keyDown(textarea, { key: "ArrowUp", altKey: true });
       fireEvent.change(textarea, { target: { value: "Inspect parent" } });
