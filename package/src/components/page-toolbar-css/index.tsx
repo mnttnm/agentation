@@ -2253,7 +2253,10 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         // release still opens the popup when the keydowns were never seen
         // (keys already held before activation, or pressed while focus was
         // outside the document).
-        modifiersHeldRef.current = { cmd: true, shift: true };
+        multiSelectModifiersHeldRef.current = {
+          meta: e.metaKey,
+          ctrl: e.ctrlKey,
+        };
 
         const elementUnder = deepElementFromPoint(e.clientX, e.clientY);
         if (!elementUnder) return;
