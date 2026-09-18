@@ -35,6 +35,7 @@ describe("PageFeedbackToolbarCSS", () => {
       const child = container.querySelector("#child") as HTMLElement;
       Object.defineProperty(document, "elementFromPoint", {
         configurable: true,
+        writable: true,
         value: vi.fn().mockReturnValue(child),
       });
 
