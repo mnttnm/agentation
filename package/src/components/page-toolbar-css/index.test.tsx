@@ -21,6 +21,35 @@ afterEach(() => {
 });
 
 describe("PageFeedbackToolbarCSS", () => {
+  describe("DOM navigation shortcuts", () => {
+    it("selects the parent element with Alt+ArrowUp", async () => {
+      const handleAnnotation = vi.fn();
+      const { container } = render(
+        <>
+          <div id="parent">
+            <button id="child">Child</button>
+          </div>
+          <PageFeedbackToolbarCSS onAnnotationAdd={handleAnnotation} />
+        </>,
+      );
+      const child = container.querySelector("#child") as HTMLElement;
+      vi.spyOn(document, "elementFromPoint").mockReturnValue(child);
+
+      fireEvent.click(await screen.findByTitle("Start feedback mode"));
+      fireEvent.click(child, { clientX: 20, clientY: 20 });
+
+      const textarea = await screen.findByPlaceholderText("What should change?");
+      expect(screen.getByText(/Alt\+↑ parent/)).toBeInTheDocument();
+
+      fireEvent.keyDown(textarea, { key: "ArrowUp", altKey: true });
+      fireEvent.change(textarea, { target: { value: "Inspect parent" } });
+      fireEvent.click(screen.getByText("Add"));
+
+      await waitFor(() => expect(handleAnnotation).toHaveBeenCalledOnce());
+      expect(handleAnnotation.mock.calls[0][0].elementPath).toContain("#parent");
+    });
+  });
+
   describe("onAnnotationAdd callback", () => {
     it("should accept onAnnotationAdd prop without errors", () => {
       const handleAnnotation = vi.fn();

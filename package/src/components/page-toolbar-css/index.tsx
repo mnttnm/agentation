@@ -1660,6 +1660,55 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     }
   }, [isFrozen, freezeAnimations, unfreezeAnimations]);
 
+  // Replace the current pending selection while keeping the annotation popup open.
+  const selectPendingElement = useCallback(
+    (
+      element: HTMLElement,
+      options?: {
+        clientX?: number;
+        clientY?: number;
+        selectedText?: string;
+      },
+    ) => {
+      const rect = element.getBoundingClientRect();
+      const { name, path, reactComponents } = identifyElementWithReact(
+        element,
+        effectiveReactMode,
+      );
+      const isFixed = isElementFixed(element);
+      const clientX = options?.clientX ?? rect.left + rect.width / 2;
+      const clientY = options?.clientY ?? rect.top + rect.height / 2;
+
+      setPendingAnnotation({
+        x: (clientX / window.innerWidth) * 100,
+        y: isFixed ? clientY : clientY + window.scrollY,
+        clientY,
+        element: name,
+        elementPath: path,
+        selectedText: options?.selectedText,
+        boundingBox: {
+          x: rect.left,
+          y: isFixed ? rect.top : rect.top + window.scrollY,
+          width: rect.width,
+          height: rect.height,
+        },
+        nearbyText: getNearbyText(element),
+        cssClasses: getElementClasses(element),
+        isFixed,
+        fullPath: getFullElementPath(element),
+        accessibility: getAccessibilityInfo(element),
+        computedStyles: getForensicComputedStyles(element),
+        computedStylesObj: getDetailedComputedStyles(element),
+        nearbyElements: getNearbyElements(element),
+        reactComponents: reactComponents ?? undefined,
+        sourceFile: detectSourceFile(element),
+        targetElement: element,
+      });
+      setHoverInfo(null);
+    },
+    [effectiveReactMode],
+  );
+
   // Create pending annotation from cmd+shift+click multi-select
   const createMultiSelectPendingAnnotation = useCallback(() => {
     if (pendingMultiSelectElements.length === 0) return;
@@ -2015,52 +2064,12 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
       const elementUnder = deepElementFromPoint(e.clientX, e.clientY);
       if (!elementUnder) return;
 
-      const { name, path, reactComponents } = identifyElementWithReact(
-        elementUnder,
-        effectiveReactMode,
-      );
-      const rect = elementUnder.getBoundingClientRect();
-      const x = (e.clientX / window.innerWidth) * 100;
-
-      const isFixed = isElementFixed(elementUnder);
-      const y = isFixed ? e.clientY : e.clientY + window.scrollY;
-
-      const selection = window.getSelection();
-      let selectedText: string | undefined;
-      if (selection && selection.toString().trim().length > 0) {
-        selectedText = selection.toString().trim().slice(0, 500);
-      }
-
-      // Capture computed styles - filtered for popup, full for forensic output
-      const computedStylesObj = getDetailedComputedStyles(elementUnder);
-      const computedStylesStr = getForensicComputedStyles(elementUnder);
-
-      setPendingAnnotation({
-        x,
-        y,
+      const selectedText = window.getSelection()?.toString().trim().slice(0, 500);
+      selectPendingElement(elementUnder, {
+        clientX: e.clientX,
         clientY: e.clientY,
-        element: name,
-        elementPath: path,
-        selectedText,
-        boundingBox: {
-          x: rect.left,
-          y: isFixed ? rect.top : rect.top + window.scrollY,
-          width: rect.width,
-          height: rect.height,
-        },
-        nearbyText: getNearbyText(elementUnder),
-        cssClasses: getElementClasses(elementUnder),
-        isFixed,
-        fullPath: getFullElementPath(elementUnder),
-        accessibility: getAccessibilityInfo(elementUnder),
-        computedStyles: computedStylesStr,
-        computedStylesObj,
-        nearbyElements: getNearbyElements(elementUnder),
-        reactComponents: reactComponents ?? undefined,
-        sourceFile: detectSourceFile(elementUnder),
-        targetElement: elementUnder, // Store for live position queries
+        selectedText: selectedText || undefined,
       });
-      setHoverInfo(null);
     };
 
     // Use capture phase to intercept before element handlers
@@ -2075,6 +2084,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     settings.blockInteractions,
     effectiveReactMode,
     pendingMultiSelectElements,
+    selectPendingElement,
   ]);
 
   // Cmd+shift+click multi-select: keyup listener for modifier release
@@ -3412,6 +3422,40 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
         return;
       }
 
+      // Navigate a single pending element even while the annotation textarea has focus.
+      if (
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        isActive &&
+        !isDrawMode &&
+        !isDesignMode &&
+        !editingAnnotation &&
+        pendingAnnotation?.targetElement &&
+        !pendingAnnotation.isMultiSelect &&
+        document.contains(pendingAnnotation.targetElement)
+      ) {
+        const current = pendingAnnotation.targetElement;
+        let next: HTMLElement | null = null;
+
+        if (e.key === "ArrowUp") {
+          next = current.parentElement;
+        } else if (e.key === "ArrowDown") {
+          next = current.firstElementChild as HTMLElement | null;
+        } else if (e.shiftKey && e.key === "ArrowLeft") {
+          next = current.previousElementSibling as HTMLElement | null;
+        } else if (e.shiftKey && e.key === "ArrowRight") {
+          next = current.nextElementSibling as HTMLElement | null;
+        } else {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        if (next) selectPendingElement(next);
+        return;
+      }
+
       // Skip other shortcuts if typing or modifier keys are held
       if (isTyping || e.metaKey || e.ctrlKey) return;
 
@@ -3491,6 +3535,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     designPlacements,
     rearrangeState,
     pendingAnnotation,
+    editingAnnotation,
     annotations.length,
     settings.webhookUrl,
     webhookUrl,
@@ -3500,6 +3545,7 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
     copyOutput,
     clearAll,
     pendingMultiSelectElements,
+    selectPendingElement,
   ]);
 
   if (!mounted) return null;
@@ -4521,6 +4567,12 @@ const [settings, setSettings] = useState<ToolbarSettings>(() => {
                       element={pendingAnnotation.element}
                       selectedText={pendingAnnotation.selectedText}
                       computedStyles={pendingAnnotation.computedStylesObj}
+                      navigationHint={
+                        pendingAnnotation.targetElement &&
+                        !pendingAnnotation.isMultiSelect
+                          ? "Alt+↑ parent · Alt+↓ child · Alt+Shift+←/→ sibling"
+                          : undefined
+                      }
                       placeholder={
                         pendingAnnotation.element === "Area selection"
                           ? "What should change in this area?"
