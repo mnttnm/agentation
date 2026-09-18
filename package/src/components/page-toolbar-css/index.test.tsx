@@ -277,7 +277,7 @@ describe("blockInteractions", () => {
   });
 });
 
-describe("cmd+shift multi-select", () => {
+describe("modifier-click multi-select", () => {
   it("opens the popup on modifier release even when the keydowns were never observed", () => {
     render(
       <>
@@ -299,7 +299,7 @@ describe("cmd+shift multi-select", () => {
 
     expect(document.querySelector("[data-annotation-popup]")).toBeNull();
 
-    fireEvent.keyUp(document, { key: "Shift", metaKey: true });
+    fireEvent.keyUp(document, { key: "Meta" });
 
     expect(document.querySelector("[data-annotation-popup]")).not.toBeNull();
   });
